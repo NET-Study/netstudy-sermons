@@ -31,14 +31,14 @@ Sermons remain the property of the preachers and ministries who hold their right
 
 ## Filtering preachers
 
-The app ships with a filter that hides sermons from 81 preachers in three traditions: Wesleyan-Arminian, Pentecostal/Charismatic and Anglican. About 10,700 of the 70,419 sermons never appear, and every list says so ("2,369 of 2,504 sermons") instead of quietly shrinking.
+The app ships with a filter that hides sermons from 78 preachers in three traditions: Wesleyan-Arminian, Pentecostal/Charismatic and Anglican. About 10,200 of the 70,419 sermons never appear, and every list says so ("2,369 of 2,504 sermons") instead of quietly shrinking.
 
 The SermonIndex API has no denomination, tradition or affiliation field, so this cannot be derived from the data. The list is curated by hand in [`src/filters.ts`](src/filters.ts), one line per preacher with a short reason. Each entry has to be checked against the roster rather than inferred from a keyword: several bios mention "holiness" or "assemblies" without meaning the Wesleyan or Assemblies of God sense.
 
 Two judgement calls worth knowing about:
 
 - **Kept:** Calvary Chapel preachers (Chuck Smith, David Guzik and others). Calvary Chapel is not Pentecostal and distances itself from the movement, though it is charismatic-adjacent.
-- **Removed:** Anglican evangelicals who are Reformed (J.C. Ryle, George Whitefield, John Newton, J.I. Packer). They are Anglican by ordination, so they are on the list.
+- **Kept:** the Reformed Anglicans J.C. Ryle, George Whitefield and J.I. Packer, who are Anglican by ordination but Reformed in doctrine. John Newton, J.H. Newman and the rest of the Anglican clergy remain on the list.
 
 The sidebar footer shows how many preachers are hidden and opens a page listing every one of them with the reason. To change the list, edit `src/filters.ts`; to disable the filter, return an empty array from `allExclusions()`.
 

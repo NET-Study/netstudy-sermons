@@ -9,6 +9,9 @@
 //
 // To change the filter, edit the groups below. To turn it off entirely,
 // return an empty array from `allExclusions()`.
+//
+// Deliberately kept out of the Anglican list: J.C. Ryle, George Whitefield and
+// J.I. Packer, who are Reformed in doctrine and were added back by request.
 
 export type Tradition = "Wesleyan-Arminian" | "Pentecostal / Charismatic" | "Anglican";
 
@@ -110,9 +113,7 @@ const GROUPS: Group[] = [
     tradition: "Anglican",
     blurb: "Bishops, clergy and lay writers of the Church of England, the Episcopal Church and the Anglican Communion.",
     rows: [
-      ["jc-ryle", "J.C. Ryle", "First Bishop of Liverpool"],
       ["john-newton", "John Newton", "Anglican clergyman"],
-      ["george-whitefield", "George Whitefield", "Anglican priest"],
       ["jh-newman", "J.H. Newman", "Anglican priest and Tractarian"],
       ["wh-griffith-thomas", "W.H. Griffith Thomas", "Anglican clergyman and scholar"],
       ["wr-inge", "W.R. Inge", "Dean of St Paul's"],
@@ -121,7 +122,6 @@ const GROUPS: Group[] = [
       ["thomas-reade", "Thomas Reade", "Anglican clergyman"],
       ["favell-lee-mortimer", "Favell Lee Mortimer", "Anglican evangelical author"],
       ["cs-lewis", "C.S. Lewis", "Anglican layman"],
-      ["ji-packer", "J.I. Packer", "Anglican priest"],
       ["john-stott", "John Stott", "Anglican priest"],
       ["thaddeus-barnum", "Thaddeus Barnum", "Anglican (ACNA) bishop"],
       ["jackie-pullinger", "Jackie Pullinger", "Anglican missionary"],
