@@ -13,14 +13,7 @@ import {
   type Stats,
 } from "./api";
 import { Player, type PlayerState } from "./player";
-import {
-  FILTER_GROUPS,
-  FILTERED_PREACHER_COUNT,
-  exclusionFor,
-  isFiltered,
-  keepPreachers,
-  keepSermons,
-} from "./filters";
+import { KEPT, KEPT_PREACHER_COUNT, keptFor, isFiltered, keepPreachers, keepSermons } from "./filters";
 import { listen } from "@tauri-apps/api/event";
 
 // ---- types -----------------------------------------------------------------
@@ -254,6 +247,9 @@ function cardGrid(sermons: Sermon[]): string {
 }
 
 function listBlock(key: string, sermons: Sermon[], step = 80): string {
+  if (!sermons.length) {
+    return `<div class="note-card"><h3>Nothing from your preachers here</h3><p>None of the ${KEPT_PREACHER_COUNT} kept preachers preached on this. <button class="link" data-goto='{"name":"filtered"}'>See who is kept</button></p></div>`;
+  }
   const shown = limits[key] ?? step;
   return `<div class="list">${sermons.slice(0, shown).map((s) => sermonRow(s)).join("")}</div>
     ${
@@ -396,7 +392,7 @@ async function render(scroll = false) {
         viewRecent();
         break;
       case "filtered":
-        setCrumbs([{ label: "Filtered preachers" }]);
+        setCrumbs([{ label: "Preachers kept" }]);
         viewFiltered();
         break;
       case "sermon":
@@ -428,7 +424,7 @@ async function viewHome(myEpoch: number) {
   if (myEpoch !== epoch) return;
   if (stats) {
     const counts = document.querySelector("#library-counts");
-    if (counts) counts.textContent = `${stats.sermons.toLocaleString()} sermons · ${stats.speakers.toLocaleString()} preachers`;
+    if (counts) counts.textContent = `${stats.sermons.toLocaleString()} sermons in the archive`;
   }
   const popular = await api.popular().catch(() => ({ sermons: [] as Sermon[] }));
   if (myEpoch !== epoch) return;
@@ -454,10 +450,10 @@ async function viewHome(myEpoch: number) {
       <div class="hero-inner">
         <div class="eyebrow">Trusted preaching, freely given</div>
         <h1>The whole archive,<br/><em>one quiet room.</em></h1>
-        <p class="hero-copy">Search ${stats ? stats.sermons.toLocaleString() : "seventy thousand"} sermons by verse, theme or preacher, and listen without leaving the page.</p>
+        <p class="hero-copy">The archive's preaching from ${KEPT_PREACHER_COUNT} preachers you have chosen, searchable by verse, theme or name.</p>
         <div class="hero-stats">
-          <div><strong>${stats ? stats.sermons.toLocaleString() : "70,419"}</strong><span>sermons</span></div>
-          <div><strong>${stats ? stats.speakers.toLocaleString() : "2,211"}</strong><span>preachers</span></div>
+          <div><strong>${KEPT_PREACHER_COUNT}</strong><span>preachers kept</span></div>
+          <div><strong>${stats ? stats.sermons.toLocaleString() : "70,419"}</strong><span>in the archive</span></div>
           <div><strong>${stats ? stats.topics.toLocaleString() : "14,087"}</strong><span>themes</span></div>
         </div>
         <div class="hero-suggest">
@@ -465,7 +461,7 @@ async function viewHome(myEpoch: number) {
           <button class="chip" data-ref="John 3:16">John 3:16</button>
           <button class="chip" data-ref="Romans 8">Romans 8</button>
           <button class="chip" data-topic="revival">Revival</button>
-          <button class="chip" data-speaker="aw-tozer">A.W. Tozer</button>
+          <button class="chip" data-speaker="ch-spurgeon">C.H. Spurgeon</button>
         </div>
       </div>
     </section>
@@ -689,7 +685,7 @@ async function viewSpeakers(myEpoch: number) {
       <div><div class="eyebrow">The men behind the messages</div><h1>Preachers</h1></div>
       <div class="head-stat"><strong>${all.length ? all.length.toLocaleString() : "—"}</strong><span>preachers</span></div>
     </div>
-    ${FILTERED_PREACHER_COUNT ? `<p class="foot-note">${FILTERED_PREACHER_COUNT} preachers are hidden by your filter. <button class="link" data-goto='{"name":"filtered"}'>See who</button></p>` : ""}
+    <p class="foot-note">Only the ${KEPT_PREACHER_COUNT} preachers on your list are shown. <button class="link" data-goto='{"name":"filtered"}'>See who</button></p>
     <div class="filter-bar"><input id="speaker-filter" placeholder="Filter preachers…" spellcheck="false"/></div>
     <div id="speaker-list" class="speaker-grid">${speakerCards(all.slice(0, 120))}</div>
   `;
@@ -748,13 +744,16 @@ async function viewTopic(myEpoch: number) {
 
 async function viewSpeaker(myEpoch: number) {
   const v = view as { slug: string; page?: number };
-  const hidden = exclusionFor(v.slug);
-  if (hidden) {
+  if (!keptFor(v.slug)) {
+    const name = v.slug
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
     content.innerHTML = `
       <div class="note-card">
-        <h3>Hidden by your filter</h3>
-        <p><strong>${esc(hidden.name)}</strong> is a ${esc(hidden.tradition)} preacher (${esc(hidden.note)}), which this app is set to leave out.</p>
-        <p class="muted">The list lives in <code>src/filters.ts</code>. <button class="link" data-goto='{"name":"filtered"}'>Review the filtered preachers</button></p>
+        <h3>Not on your list</h3>
+        <p><strong>${esc(name)}</strong> is not one of the ${KEPT_PREACHER_COUNT} preachers this app keeps, so their sermons are hidden.</p>
+        <p class="muted">The list lives in <code>src/filters.ts</code>. <button class="link" data-goto='{"name":"filtered"}'>See the preachers you keep</button></p>
       </div>`;
     playable = [];
     return;
@@ -914,27 +913,18 @@ function viewRecent() {
 }
 
 function viewFiltered() {
-  const groups = FILTER_GROUPS.map(
-    (group) => `
-      <section class="filter-group">
-        <div class="block-head">
-          <h2>${esc(group.tradition)}</h2>
-          <span class="block-sub">${group.rows.length} ${group.rows.length === 1 ? "preacher" : "preachers"}</span>
-        </div>
-        <p class="filter-blurb">${esc(group.blurb)}</p>
-        <div class="filter-chips">
-          ${group.rows.map(([, name, note]) => `<span class="filter-chip" title="${esc(note)}">${esc(name)}</span>`).join("")}
-        </div>
-      </section>`,
-  ).join("");
-
   content.innerHTML = `
     <div class="page-head">
-      <div><div class="eyebrow">Your filter</div><h1>Filtered preachers</h1></div>
-      <div class="head-stat"><strong>${FILTERED_PREACHER_COUNT}</strong><span>preachers hidden</span></div>
+      <div><div class="eyebrow">Your list</div><h1>Preachers kept</h1></div>
+      <div class="head-stat"><strong>${KEPT_PREACHER_COUNT}</strong><span>preachers</span></div>
     </div>
-    <p class="foot-note">Sermons from these preachers are left out of every list, search result and queue. The SermonIndex API carries no denomination field, so the list is curated by hand in <code>src/filters.ts</code>, one line per preacher.</p>
-    ${groups}
+    <p class="foot-note">Every sermon from anyone not on this list is hidden across the app: lists, search, the queue and your history. The list is set by hand in <code>src/filters.ts</code>, because the SermonIndex API carries no denomination or affiliation field.</p>
+    <section class="filter-group">
+      <div class="block-head"><h2>Kept</h2><span class="block-sub">${KEPT_PREACHER_COUNT} preachers</span></div>
+      <div class="filter-chips">
+        ${KEPT.map((p) => `<span class="filter-chip" title="${esc(p.note)}">${esc(p.name)}</span>`).join("")}
+      </div>
+    </section>
   `;
 }
 
@@ -943,12 +933,11 @@ async function viewSermon(myEpoch: number) {
   const data = await api.sermon(id);
   if (myEpoch !== epoch) return;
   if (isFiltered(data.speakerSlug)) {
-    const hidden = exclusionFor(data.speakerSlug);
     content.innerHTML = `
       <div class="note-card">
-        <h3>Hidden by your filter</h3>
-        <p>“${esc(data.title)}” is by <strong>${esc(data.speaker)}</strong>, a ${esc(hidden?.tradition ?? "")} preacher this app is set to leave out.</p>
-        <p class="muted"><button class="link" data-goto='{"name":"filtered"}'>Review the filtered preachers</button></p>
+        <h3>Not on your list</h3>
+        <p>“${esc(data.title)}” is by <strong>${esc(data.speaker)}</strong>, who is not one of the ${KEPT_PREACHER_COUNT} preachers this app keeps.</p>
+        <p class="muted"><button class="link" data-goto='{"name":"filtered"}'>See the preachers you keep</button></p>
       </div>`;
     playable = [];
     return;
@@ -1304,8 +1293,8 @@ document.addEventListener("keydown", (event) => {
 async function boot() {
   await loadState();
   const note = $("#filter-note");
-  note.textContent = `${FILTERED_PREACHER_COUNT} preachers filtered`;
-  note.title = FILTER_GROUPS.map((g) => g.tradition).join(", ");
+  note.textContent = `${KEPT_PREACHER_COUNT} preachers kept`;
+  note.title = "Every other preacher in the archive is hidden";
   note.addEventListener("click", () => navigate({ name: "filtered" }));
   render();
 
