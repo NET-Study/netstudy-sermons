@@ -401,13 +401,15 @@ async function main() {
     assert(/preachers are hidden/.test(note), `no filter note (${note})`);
   });
 
-  await check("filtered preachers page names all three traditions", async () => {
+  await check("filtered preachers page names every tradition", async () => {
     await page.click("#filter-note");
     await page.waitForSelector(".filter-group", { timeout: 5000 });
     const heads = await page.$$eval(".filter-group h2", (els) => els.map((e) => e.textContent.trim()));
-    assert(heads.length === 3, `groups: ${JSON.stringify(heads)}`);
-    assert(/Wesleyan-Arminian/.test(heads.join()) && /Pentecostal/.test(heads.join()) && /Anglican/.test(heads.join()),
-      `groups: ${JSON.stringify(heads)}`);
+    const joined = heads.join("|");
+    assert(heads.length === 4, `groups: ${JSON.stringify(heads)}`);
+    for (const name of ["Wesleyan-Arminian", "Pentecostal", "Calvary Chapel", "Anglican"]) {
+      assert(joined.includes(name), `missing ${name} in ${JSON.stringify(heads)}`);
+    }
     const chips = await page.$$eval(".filter-chip", (els) => els.length);
     assert(chips === FILTERED.size, `${chips} chips for ${FILTERED.size} preachers`);
     await page.screenshot({ path: path.join(ROOT, "docs", "filtered-preachers.png") });

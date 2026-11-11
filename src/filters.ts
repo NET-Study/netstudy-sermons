@@ -13,7 +13,7 @@
 // Deliberately kept out of the Anglican list: J.C. Ryle, George Whitefield and
 // J.I. Packer, who are Reformed in doctrine and were added back by request.
 
-export type Tradition = "Wesleyan-Arminian" | "Pentecostal / Charismatic" | "Anglican";
+export type Tradition = "Wesleyan-Arminian" | "Pentecostal / Charismatic" | "Calvary Chapel" | "Anglican";
 
 export interface Exclusion {
   slug: string;
@@ -107,6 +107,22 @@ const GROUPS: Group[] = [
       ["manley-beasley", "Manley Beasley", "Charismatic revival evangelist"],
       ["greg-locke", "Greg Locke", "Charismatic revival pastor"],
       ["brian-guerin", "Brian Guerin", "Charismatic prophetic teacher"],
+    ],
+  },
+  {
+    tradition: "Calvary Chapel",
+    blurb: "Chuck Smith's Calvary Chapel movement and the fellowships and networks that grew out of it.",
+    rows: [
+      ["chuck-smith", "Chuck Smith", "Founder of the Calvary Chapel movement"],
+      ["kay-smith", "Kay Smith", "Calvary Chapel Costa Mesa, Joyful Life"],
+      ["david-guzik", "David Guzik", "Calvary Chapel pastor, Enduring Word"],
+      ["brian-brodersen", "Brian Brodersen", "Calvary Global Network president"],
+      ["bob-hoekstra", "Bob Hoekstra", "Calvary Chapel pastor"],
+      ["jack-hibbs", "Jack Hibbs", "Calvary Chapel Chino Hills"],
+      ["danny-bond", "Danny Bond", "Calvary Chapel preacher"],
+      ["joe-focht", "Joe Focht", "Calvary Chapel of Philadelphia"],
+      ["skip-heitzig", "Skip Heitzig", "Calvary Church, Albuquerque"],
+      ["jon-courson", "Jon Courson", "Applegate Christian Fellowship, Calvary Chapel"],
     ],
   },
   {
