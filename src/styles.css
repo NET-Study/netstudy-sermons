@@ -218,10 +218,34 @@ input {
   border-top: 1px solid var(--stroke);
 }
 
+/* The player bar is fixed to the window, so the footer has to step up out of
+   its way or the filter note and attribution link sit underneath it. */
+body.player-open #sidebar {
+  padding-bottom: calc(var(--player-h) + 14px);
+}
+
 .counts {
   font-size: 11px;
   color: var(--faint);
   line-height: 1.5;
+}
+
+.filter-note {
+  font: inherit;
+  font-size: 11px;
+  color: var(--faint);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.13s ease;
+}
+.filter-note:empty {
+  display: none;
+}
+.filter-note:hover {
+  color: var(--gold);
 }
 
 .attribution {
@@ -1833,4 +1857,41 @@ h3 {
   .np-meta {
     display: none;
   }
+}
+
+/* ---- filtered preachers --------------------------------------------------- */
+
+.filter-group {
+  margin: 30px 0 6px;
+}
+
+.filter-blurb {
+  margin: -4px 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  cursor: default;
+}
+
+.filter-chip:hover {
+  color: var(--text);
+  border-color: var(--gold-dim);
+}
+
+.head-stat em {
+  font-style: normal;
 }

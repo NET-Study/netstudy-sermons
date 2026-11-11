@@ -13,6 +13,14 @@ import {
   type Stats,
 } from "./api";
 import { Player, type PlayerState } from "./player";
+import {
+  FILTER_GROUPS,
+  FILTERED_PREACHER_COUNT,
+  exclusionFor,
+  isFiltered,
+  keepPreachers,
+  keepSermons,
+} from "./filters";
 import { listen } from "@tauri-apps/api/event";
 
 // ---- types -----------------------------------------------------------------
@@ -28,6 +36,7 @@ type View =
   | { name: "speaker"; slug: string; page?: number }
   | { name: "search"; query: string }
   | { name: "recent" }
+  | { name: "filtered" }
   | { name: "sermon"; id: string };
 
 interface Recent {
@@ -114,7 +123,7 @@ async function loadState() {
   try {
     const state = (await local.load()) as Persisted | null;
     if (state) {
-      recents = Array.isArray(state.recents) ? state.recents : [];
+      recents = Array.isArray(state.recents) ? state.recents.filter((r) => !isFiltered(r.speakerSlug)) : [];
       if (state.prefs) prefs = { ...prefs, ...state.prefs };
     }
   } catch {
@@ -256,6 +265,19 @@ function listBlock(key: string, sermons: Sermon[], step = 80): string {
     }`;
 }
 
+/**
+ * Head-stat markup. When the filter has removed sermons from a list, the big
+ * number is what the app will actually play and the library total sits
+ * underneath, so the count never contradicts the list below it.
+ */
+function countStat(shown: number, total?: number): string {
+  const library = Number(total) || shown;
+  if (library > shown) {
+    return `<div class="head-stat"><strong>${shown.toLocaleString()}</strong><span>of ${library.toLocaleString()} sermons</span></div>`;
+  }
+  return `<div class="head-stat"><strong>${shown.toLocaleString()}</strong><span>sermons</span></div>`;
+}
+
 function skeleton(count = 6): string {
   return `<div class="list">${Array.from({ length: count })
     .map(
@@ -320,6 +342,7 @@ async function render(scroll = false) {
     speaker: "speakers",
     search: "home",
     recent: "recent",
+    filtered: "",
     sermon: "",
   };
   setActiveNav(navFor[view.name] ?? "");
@@ -372,6 +395,10 @@ async function render(scroll = false) {
         setCrumbs([{ label: "Recently played" }]);
         viewRecent();
         break;
+      case "filtered":
+        setCrumbs([{ label: "Filtered preachers" }]);
+        viewFiltered();
+        break;
       case "sermon":
         setCrumbs([{ label: "Sermon" }]);
         await viewSermon(myEpoch);
@@ -405,6 +432,7 @@ async function viewHome(myEpoch: number) {
   }
   const popular = await api.popular().catch(() => ({ sermons: [] as Sermon[] }));
   if (myEpoch !== epoch) return;
+  const pick = keepSermons(popular.sermons);
 
   const resume = recents.slice(0, 5);
   content.innerHTML = `
@@ -437,7 +465,7 @@ async function viewHome(myEpoch: number) {
           <button class="chip" data-ref="John 3:16">John 3:16</button>
           <button class="chip" data-ref="Romans 8">Romans 8</button>
           <button class="chip" data-topic="revival">Revival</button>
-          <button class="chip" data-speaker="leonard-ravenhill">Leonard Ravenhill</button>
+          <button class="chip" data-speaker="aw-tozer">A.W. Tozer</button>
         </div>
       </div>
     </section>
@@ -466,8 +494,8 @@ async function viewHome(myEpoch: number) {
 
     <section class="block">
       <div class="block-head"><h2>Most listened</h2><span class="block-sub">The 500 most played in the library</span></div>
-      ${popular.sermons.length ? cardGrid(popular.sermons.slice(0, 18)) : skeleton(4)}
-      ${popular.sermons.length ? `<button class="load-more" data-popular-more="1">Show more from the top 500</button>` : ""}
+      ${pick.length ? cardGrid(pick.slice(0, 18)) : skeleton(4)}
+      ${pick.length ? `<button class="load-more" data-popular-more="1">Show more from the top 500</button>` : ""}
     </section>
 
     <section class="block browse">
@@ -488,7 +516,7 @@ async function viewHome(myEpoch: number) {
       </div>
     </section>
   `;
-  playable = popular.sermons;
+  playable = pick;
 }
 
 async function viewScripture(myEpoch: number) {
@@ -556,26 +584,28 @@ async function viewChapter(myEpoch: number) {
   if (verse) {
     const data = await api.verse(bookId, chapter, verse);
     if (myEpoch !== epoch) return;
-    playable = data.sermons;
+    const sermons = keepSermons(data.sermons);
+    playable = sermons;
     content.innerHTML = `
       <div class="page-head">
         <div><div class="eyebrow">Scripture</div><h1>${esc(data.reference)}</h1></div>
-        <div class="head-stat"><strong>${data.sermonCount.toLocaleString()}</strong><span>sermons</span></div>
+        ${countStat(sermons.length, data.sermonCount)}
       </div>
       <div class="head-actions"><button class="soft-btn" data-chapter="${chapter}">All of ${esc(bookName(bookId))} ${chapter}</button></div>
-      ${listBlock(`v-${bookId}-${chapter}-${verse}`, data.sermons)}
+      ${listBlock(`v-${bookId}-${chapter}-${verse}`, sermons)}
     `;
     return;
   }
   const data = await api.chapter(bookId, chapter);
   if (myEpoch !== epoch) return;
-  playable = data.sermons;
+  const sermons = keepSermons(data.sermons);
+  playable = sermons;
   const verses = (data.verses || []).filter((v) => v.sermonCount > 0);
   const max = Math.max(...verses.map((v) => v.sermonCount), 1);
   content.innerHTML = `
     <div class="page-head">
       <div><div class="eyebrow">Scripture</div><h1>${esc(data.reference)}</h1></div>
-      <div class="head-stat"><strong>${data.sermonCount.toLocaleString()}</strong><span>sermons</span></div>
+      ${countStat(sermons.length, data.sermonCount)}
     </div>
     ${
       verses.length
@@ -587,7 +617,7 @@ async function viewChapter(myEpoch: number) {
             .join("")}</div>`
         : ""
     }
-    ${listBlock(`c-${bookId}-${chapter}`, data.sermons)}
+    ${listBlock(`c-${bookId}-${chapter}`, sermons)}
   `;
 }
 
@@ -653,12 +683,13 @@ async function viewSpeakers(myEpoch: number) {
     if (ready) speakerIndex = await loadIndex("speakers");
   }
   if (myEpoch !== epoch) return;
-  const all = speakerIndex.slice().sort((a, b) => b.count - a.count);
+  const all = keepPreachers(speakerIndex).sort((a, b) => b.count - a.count);
   content.innerHTML = `
     <div class="page-head">
       <div><div class="eyebrow">The men behind the messages</div><h1>Preachers</h1></div>
-      <div class="head-stat"><strong>${speakerIndex.length ? speakerIndex.length.toLocaleString() : "—"}</strong><span>preachers</span></div>
+      <div class="head-stat"><strong>${all.length ? all.length.toLocaleString() : "—"}</strong><span>preachers</span></div>
     </div>
+    ${FILTERED_PREACHER_COUNT ? `<p class="foot-note">${FILTERED_PREACHER_COUNT} preachers are hidden by your filter. <button class="link" data-goto='{"name":"filtered"}'>See who</button></p>` : ""}
     <div class="filter-bar"><input id="speaker-filter" placeholder="Filter preachers…" spellcheck="false"/></div>
     <div id="speaker-list" class="speaker-grid">${speakerCards(all.slice(0, 120))}</div>
   `;
@@ -692,12 +723,12 @@ function speakerCards(items: IndexItem[]): string {
 async function viewTopic(myEpoch: number) {
   const data = await api.topic((view as { slug: string }).slug);
   if (myEpoch !== epoch) return;
-  playable = data.sermons || [];
+  playable = keepSermons(data.sermons);
   const count = Number(data.sermonCount) || playable.length;
   content.innerHTML = `
     <div class="page-head">
       <div><div class="eyebrow">Theme</div><h1>${esc(data.name)}</h1></div>
-      <div class="head-stat"><strong>${count.toLocaleString()}</strong><span>sermons</span></div>
+      ${countStat(playable.length, count)}
     </div>
     ${data.description ? `<p class="topic-desc">${esc(plain(data.description))}</p>` : ""}
     ${
@@ -717,14 +748,26 @@ async function viewTopic(myEpoch: number) {
 
 async function viewSpeaker(myEpoch: number) {
   const v = view as { slug: string; page?: number };
+  const hidden = exclusionFor(v.slug);
+  if (hidden) {
+    content.innerHTML = `
+      <div class="note-card">
+        <h3>Hidden by your filter</h3>
+        <p><strong>${esc(hidden.name)}</strong> is a ${esc(hidden.tradition)} preacher (${esc(hidden.note)}), which this app is set to leave out.</p>
+        <p class="muted">The list lives in <code>src/filters.ts</code>. <button class="link" data-goto='{"name":"filtered"}'>Review the filtered preachers</button></p>
+      </div>`;
+    playable = [];
+    return;
+  }
   if (v.page && v.page > 1) {
     const page = await api.speakerPage(v.slug, v.page);
     if (myEpoch !== epoch) return;
-    playable = page.sermons;
+    const pageSermons = keepSermons(page.sermons);
+    playable = pageSermons;
     content.innerHTML = `
       <button class="crumb inline" data-speaker="${esc(v.slug)}">‹ Back to ${esc(v.slug.replace(/-/g, " "))}</button>
       <h2 class="section-title">Page ${page.page} of ${page.totalPages}</h2>
-      ${listBlock(`s-${v.slug}-${v.page}`, page.sermons, 50)}
+      ${listBlock(`s-${v.slug}-${v.page}`, pageSermons, 50)}
       <div class="pager">
         ${page.page > 1 ? `<button class="soft-btn" data-speaker-page="${page.page - 1}">Previous</button>` : ""}
         <span>${page.page} / ${page.totalPages}</span>
@@ -748,6 +791,7 @@ async function viewSpeaker(myEpoch: number) {
       /* the full response is still usable */
     }
   }
+  sermons = keepSermons(sermons);
   playable = sermons;
   const totalPages = Math.max(1, Math.ceil(total / 50));
   content.innerHTML = `
@@ -756,7 +800,7 @@ async function viewSpeaker(myEpoch: number) {
       <div class="speaker-hero-body">
         <div class="eyebrow">Preacher</div>
         <h1>${esc(data.name)}</h1>
-        <div class="speaker-meta">${total.toLocaleString()} sermons${data.bio ? "" : ""}</div>
+        <div class="speaker-meta">${total.toLocaleString()} sermons</div>
         ${data.bio ? `<p class="speaker-bio">${esc(plain(data.bio))}</p>` : ""}
         <div class="head-actions">
           <button class="primary-btn" data-play="${sermons[0]?.id ?? ""}" ${sermons.length ? "" : "disabled"}>▶ Play the first</button>
@@ -812,7 +856,7 @@ async function viewSearch(myEpoch: number) {
     .slice(0, 12)
     .map((x) => x.t);
 
-  const speakers = speakerIndex
+  const speakers = keepPreachers(speakerIndex)
     .map((s) => ({ s, n: score(s.name) }))
     .filter((x) => x.n < 99)
     .sort((a, b) => a.n - b.n || b.s.count - a.s.count)
@@ -846,7 +890,8 @@ async function viewSearch(myEpoch: number) {
 }
 
 function viewRecent() {
-  const rows = recents
+  const items = recents.filter((r) => !isFiltered(r.speakerSlug));
+  const rows = items
     .map((r) => {
       const pct = r.total ? Math.min(100, (r.position / r.total) * 100) : 0;
       return `
@@ -863,8 +908,33 @@ function viewRecent() {
     .join("");
   content.innerHTML = `
     <div class="page-head"><div><div class="eyebrow">Your history</div><h1>Recently played</h1></div>
-      <div class="head-stat"><strong>${recents.length}</strong><span>messages</span></div></div>
-    ${recents.length ? `<div class="list">${rows}</div>` : `<div class="note-card"><h3>Nothing played yet</h3><p>Start with <button class="chip" data-ref="Romans 8">Romans 8</button> or <button class="chip" data-topic="revival">Revival</button>.</p></div>`}
+      <div class="head-stat"><strong>${items.length}</strong><span>messages</span></div></div>
+    ${items.length ? `<div class="list">${rows}</div>` : `<div class="note-card"><h3>Nothing played yet</h3><p>Start with <button class="chip" data-ref="Romans 8">Romans 8</button> or <button class="chip" data-topic="revival">Revival</button>.</p></div>`}
+  `;
+}
+
+function viewFiltered() {
+  const groups = FILTER_GROUPS.map(
+    (group) => `
+      <section class="filter-group">
+        <div class="block-head">
+          <h2>${esc(group.tradition)}</h2>
+          <span class="block-sub">${group.rows.length} ${group.rows.length === 1 ? "preacher" : "preachers"}</span>
+        </div>
+        <p class="filter-blurb">${esc(group.blurb)}</p>
+        <div class="filter-chips">
+          ${group.rows.map(([, name, note]) => `<span class="filter-chip" title="${esc(note)}">${esc(name)}</span>`).join("")}
+        </div>
+      </section>`,
+  ).join("");
+
+  content.innerHTML = `
+    <div class="page-head">
+      <div><div class="eyebrow">Your filter</div><h1>Filtered preachers</h1></div>
+      <div class="head-stat"><strong>${FILTERED_PREACHER_COUNT}</strong><span>preachers hidden</span></div>
+    </div>
+    <p class="foot-note">Sermons from these preachers are left out of every list, search result and queue. The SermonIndex API carries no denomination field, so the list is curated by hand in <code>src/filters.ts</code>, one line per preacher.</p>
+    ${groups}
   `;
 }
 
@@ -872,6 +942,17 @@ async function viewSermon(myEpoch: number) {
   const id = (view as { id: string }).id;
   const data = await api.sermon(id);
   if (myEpoch !== epoch) return;
+  if (isFiltered(data.speakerSlug)) {
+    const hidden = exclusionFor(data.speakerSlug);
+    content.innerHTML = `
+      <div class="note-card">
+        <h3>Hidden by your filter</h3>
+        <p>“${esc(data.title)}” is by <strong>${esc(data.speaker)}</strong>, a ${esc(hidden?.tradition ?? "")} preacher this app is set to leave out.</p>
+        <p class="muted"><button class="link" data-goto='{"name":"filtered"}'>Review the filtered preachers</button></p>
+      </div>`;
+    playable = [];
+    return;
+  }
   sermonMap.set(id, data);
   const transcript = plain((data as unknown as { transcriptText?: string }).transcriptText || "");
   playable = [data];
@@ -919,9 +1000,11 @@ let scrubbing = false;
 function renderPlayer(state: PlayerState = player.state) {
   if (!state.sermon) {
     playerBar.classList.add("hidden");
+    document.body.classList.remove("player-open");
     return;
   }
   playerBar.classList.remove("hidden");
+  document.body.classList.add("player-open");
   $("#np-title").textContent = state.sermon.title;
   $("#np-sub").textContent = `${state.sermon.speaker}${state.sermon.duration ? ` · ${state.sermon.duration}` : ""}`;
   const art = imageFor(state.sermon);
@@ -985,6 +1068,10 @@ document.addEventListener("click", (event) => {
   if (d.play !== undefined) {
     const sermon = sermonMap.get(d.play);
     if (!sermon) return;
+    if (isFiltered(sermon.speakerSlug)) {
+      toast("That preacher is hidden by your filter.");
+      return;
+    }
     if (sermon.mediaType === "TEXT") {
       navigate({ name: "sermon", id: sermon.id });
       return;
@@ -995,6 +1082,10 @@ document.addEventListener("click", (event) => {
   if (d.watch !== undefined) {
     const sermon = sermonMap.get(d.watch);
     if (!sermon) return;
+    if (isFiltered(sermon.speakerSlug)) {
+      toast("That preacher is hidden by your filter.");
+      return;
+    }
     player.playSermon(sermon, playable.length ? playable : undefined);
     player.openVideo();
     return;
@@ -1002,6 +1093,10 @@ document.addEventListener("click", (event) => {
   if (d.resume !== undefined) {
     const entry = recents.find((r) => r.id === d.resume);
     if (!entry) return;
+    if (isFiltered(entry.speakerSlug)) {
+      toast("That preacher is hidden by your filter.");
+      return;
+    }
     const sermon = sermonMap.get(entry.id);
     if (sermon) {
       player.playSermon(sermon);
@@ -1068,9 +1163,10 @@ document.addEventListener("click", (event) => {
     if (grid) {
       const more = (grid.children.length || 18) + 24;
       api.popular().then((data) => {
-        playable = data.sermons;
-        grid.outerHTML = cardGrid(data.sermons.slice(0, more));
-        if (more >= data.sermons.length) (target as HTMLElement).remove();
+        const visible = keepSermons(data.sermons);
+        playable = visible;
+        grid.outerHTML = cardGrid(visible.slice(0, more));
+        if (more >= visible.length) (target as HTMLElement).remove();
       });
     }
     return;
@@ -1207,6 +1303,10 @@ document.addEventListener("keydown", (event) => {
 
 async function boot() {
   await loadState();
+  const note = $("#filter-note");
+  note.textContent = `${FILTERED_PREACHER_COUNT} preachers filtered`;
+  note.title = FILTER_GROUPS.map((g) => g.tradition).join(", ");
+  note.addEventListener("click", () => navigate({ name: "filtered" }));
   render();
 
   // Books, stats and indexes are loaded in the background so the window is

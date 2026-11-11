@@ -14,6 +14,7 @@ Built with Tauri 2, so the whole app is about 5 MB and starts instantly.
 - **Listen in place.** Audio streams from Archive.org with a CDN fallback, played by a persistent bar with a queue, 15-second rewind, 30-second forward, speed control and per-sermon resume.
 - **Watch the video sermons** in a theatre overlay; audio keeps its place when you switch.
 - **Recently played** remembers position, even after a quit.
+- **A curated preacher filter** leaves out Wesleyan-Arminian, Pentecostal/Charismatic and Anglican preachers everywhere: lists, search, queue and history.
 - **Light and dark**, both derived from the NET Study plum-and-gold palette, following the system by default.
 
 ![Home, dark](docs/home-dark.png)
@@ -27,6 +28,19 @@ Everything comes from the free [SermonIndex API v2](https://sermonindex.net/api/
 - Nothing is re-hosted. Audio and video stream from SermonIndex's mirrors.
 
 Sermons remain the property of the preachers and ministries who hold their rights. SermonIndex asks that the material stay free; this app has no paid tier, no ads and no tracking.
+
+## Filtering preachers
+
+The app ships with a filter that hides sermons from 81 preachers in three traditions: Wesleyan-Arminian, Pentecostal/Charismatic and Anglican. About 10,700 of the 70,419 sermons never appear, and every list says so ("2,369 of 2,504 sermons") instead of quietly shrinking.
+
+The SermonIndex API has no denomination, tradition or affiliation field, so this cannot be derived from the data. The list is curated by hand in [`src/filters.ts`](src/filters.ts), one line per preacher with a short reason. Each entry has to be checked against the roster rather than inferred from a keyword: several bios mention "holiness" or "assemblies" without meaning the Wesleyan or Assemblies of God sense.
+
+Two judgement calls worth knowing about:
+
+- **Kept:** Calvary Chapel preachers (Chuck Smith, David Guzik and others). Calvary Chapel is not Pentecostal and distances itself from the movement, though it is charismatic-adjacent.
+- **Removed:** Anglican evangelicals who are Reformed (J.C. Ryle, George Whitefield, John Newton, J.I. Packer). They are Anglican by ordination, so they are on the list.
+
+The sidebar footer shows how many preachers are hidden and opens a page listing every one of them with the reason. To change the list, edit `src/filters.ts`; to disable the filter, return an empty array from `allExclusions()`.
 
 ## Build
 

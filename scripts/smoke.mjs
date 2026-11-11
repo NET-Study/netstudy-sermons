@@ -26,6 +26,15 @@ const MIME = {
   ".woff2": "font/woff2",
 };
 
+// The app hides a curated set of preachers. Read the same list the UI uses so
+// these assertions keep working when it is edited.
+const FILTERED = new Set(
+  [...fs.readFileSync(path.join(ROOT, "src/filters.ts"), "utf8").matchAll(/^\s*\["([a-z0-9-]+)",/gm)].map(
+    (m) => m[1],
+  ),
+);
+const keep = (sermons) => (sermons || []).filter((s) => !FILTERED.has(s.speakerSlug));
+
 const get = async (p) => {
   const res = await fetch(`${BASE}/${p}`);
   if (!res.ok) throw new Error(`${p} -> HTTP ${res.status}`);
@@ -63,8 +72,8 @@ async function fixtures() {
   const first = popular.sermons[0];
   const detail = await get(`sermons/${first.id}`);
   const revival = await get("topics/revival");
-  const speakerPage = await get("speakers/leonard-ravenhill/page/1");
-  const speakerFull = await get("speakers/leonard-ravenhill");
+  const speakerPage = await get("speakers/aw-tozer/page/1");
+  const speakerFull = await get("speakers/aw-tozer");
 
   const topics = Array.from({ length: 60 }, (_, i) => ({
     slug: i === 0 ? "revival" : `sample-theme-${i}`,
@@ -74,7 +83,7 @@ async function fixtures() {
 
   const speakers = speakerFull.sermons.length
     ? [
-        { slug: "leonard-ravenhill", name: "Leonard Ravenhill", image: speakerFull.image, count: 873 },
+        { slug: "aw-tozer", name: "A.W. Tozer", image: speakerFull.image, count: 1642 },
         ...Array.from({ length: 30 }, (_, i) => ({
           slug: `sample-preacher-${i}`,
           name: `Sample Preacher ${i}`,
@@ -107,15 +116,16 @@ async function fixtures() {
       "sermons/popular": popular,
       [`sermons/${first.id}`]: detail,
       "topics/revival": revival,
-      "speakers/leonard-ravenhill": speakerFull,
-      "speakers/leonard-ravenhill/page/1": speakerPage,
+      "speakers/aw-tozer": speakerFull,
+      "speakers/aw-tozer/page/1": speakerPage,
     },
     topics,
     speakers,
     expect: {
-      popularTitle: first.title,
-      secondTitle: popular.sermons[1].title,
-      verseCount: jhn316.sermonCount,
+      secondTitle: keep(popular.sermons)[1].title,
+      verseCount: keep(jhn316.sermons).length,
+      verseLibrary: jhn316.sermonCount,
+      popularTitle: keep(popular.sermons)[0].title,
       otBooks: books.books.filter((b) => b.testament === "OT").length,
     },
   };
@@ -269,6 +279,17 @@ async function main() {
     assert((await page.$$(".row")).length > 5, "no sermon rows");
   });
 
+  await check("filtered preachers are absent from verse results", async () => {
+    const speakers = await page.$$eval(".row [data-speaker]", (els) => els.map((e) => e.dataset.speaker));
+    const leaked = speakers.filter((slug) => FILTERED.has(slug));
+    assert(leaked.length === 0, `still listed: ${leaked.slice(0, 4).join(", ")}`);
+    const stat = await text(".head-stat span");
+    assert(
+      stat.includes(data.expect.verseLibrary.toLocaleString()),
+      `head stat did not show the library total (${stat})`,
+    );
+  });
+
   await check("playing a row fills the player bar", async () => {
     const row = await page.$(".row");
     const expected = await row.$eval(".row-title", (el) => el.textContent.trim());
@@ -371,6 +392,25 @@ async function main() {
     const active = await page.$$eval(".nav-item.active", (els) => els.map((e) => e.dataset.nav));
     assert(active.length === 1, `active items: ${JSON.stringify(active)}`);
     assert(active[0] === "speakers", `active was ${active[0]}`);
+  });
+
+  await check("preacher index leaves filtered preachers out", async () => {
+    const slugs = await page.$$eval(".speaker-card", (els) => els.map((e) => e.dataset.speaker));
+    assert(!slugs.some((slug) => FILTERED.has(slug)), "a filtered preacher is in the index");
+    const note = await text(".foot-note");
+    assert(/preachers are hidden/.test(note), `no filter note (${note})`);
+  });
+
+  await check("filtered preachers page names all three traditions", async () => {
+    await page.click("#filter-note");
+    await page.waitForSelector(".filter-group", { timeout: 5000 });
+    const heads = await page.$$eval(".filter-group h2", (els) => els.map((e) => e.textContent.trim()));
+    assert(heads.length === 3, `groups: ${JSON.stringify(heads)}`);
+    assert(/Wesleyan-Arminian/.test(heads.join()) && /Pentecostal/.test(heads.join()) && /Anglican/.test(heads.join()),
+      `groups: ${JSON.stringify(heads)}`);
+    const chips = await page.$$eval(".filter-chip", (els) => els.length);
+    assert(chips === FILTERED.size, `${chips} chips for ${FILTERED.size} preachers`);
+    await page.screenshot({ path: path.join(ROOT, "docs", "filtered-preachers.png") });
   });
 
   await check("theme toggle switches to dark", async () => {
