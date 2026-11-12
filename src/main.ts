@@ -10,7 +10,6 @@ import {
   type Book,
   type IndexItem,
   type Sermon,
-  type Stats,
 } from "./api";
 import { Player, type PlayerState } from "./player";
 import { KEPT, KEPT_PREACHER_COUNT, keptFor, isFiltered, keepPreachers, keepSermons } from "./filters";
@@ -68,7 +67,6 @@ const toastEl = $("#toast");
 let view: View = { name: "home" };
 let stack: View[] = [];
 let books: Book[] = [];
-let stats: Stats | null = null;
 let topicIndex: IndexItem[] = [];
 let speakerIndex: IndexItem[] = [];
 let recents: Recent[] = [];
@@ -418,14 +416,6 @@ async function ensureBooks() {
 }
 
 async function viewHome(myEpoch: number) {
-  if (!stats) {
-    stats = await api.stats().catch(() => null);
-  }
-  if (myEpoch !== epoch) return;
-  if (stats) {
-    const counts = document.querySelector("#library-counts");
-    if (counts) counts.textContent = `${stats.sermons.toLocaleString()} sermons in the archive`;
-  }
   const popular = await api.popular().catch(() => ({ sermons: [] as Sermon[] }));
   if (myEpoch !== epoch) return;
   const pick = keepSermons(popular.sermons);
@@ -449,12 +439,10 @@ async function viewHome(myEpoch: number) {
       </svg>
       <div class="hero-inner">
         <div class="eyebrow">Trusted preaching, freely given</div>
-        <h1>The whole archive,<br/><em>one quiet room.</em></h1>
-        <p class="hero-copy">The archive's preaching from ${KEPT_PREACHER_COUNT} preachers you have chosen, searchable by verse, theme or name.</p>
+        <h1>A curated archive,<br/><em>one quiet room.</em></h1>
+        <p class="hero-copy">Preaching from ${KEPT_PREACHER_COUNT} hand-picked, theologically accurate preachers, searchable by verse, theme or name.</p>
         <div class="hero-stats">
           <div><strong>${KEPT_PREACHER_COUNT}</strong><span>preachers kept</span></div>
-          <div><strong>${stats ? stats.sermons.toLocaleString() : "70,419"}</strong><span>in the archive</span></div>
-          <div><strong>${stats ? stats.topics.toLocaleString() : "14,087"}</strong><span>themes</span></div>
         </div>
         <div class="hero-suggest">
           <span>Try</span>
@@ -494,23 +482,6 @@ async function viewHome(myEpoch: number) {
       ${pick.length ? `<button class="load-more" data-popular-more="1">Show more from the top 500</button>` : ""}
     </section>
 
-    <section class="block browse">
-      <div class="tile" data-goto='{"name":"scripture"}'>
-        <div class="tile-glyph">✧</div>
-        <h3>By scripture</h3>
-        <p>Every book, chapter and verse, with the sermons that open it.</p>
-      </div>
-      <div class="tile" data-goto='{"name":"topics"}'>
-        <div class="tile-glyph">❖</div>
-        <h3>By theme</h3>
-        <p>${stats ? stats.topics.toLocaleString() : "14,087"} topics from prayer to revival.</p>
-      </div>
-      <div class="tile" data-goto='{"name":"speakers"}'>
-        <div class="tile-glyph">☗</div>
-        <h3>By preacher</h3>
-        <p>${stats ? stats.speakers.toLocaleString() : "2,211"} men and their full catalogues.</p>
-      </div>
-    </section>
   `;
   playable = pick;
 }

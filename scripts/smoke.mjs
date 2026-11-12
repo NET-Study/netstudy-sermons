@@ -252,8 +252,10 @@ async function main() {
 
   await check("home renders the hero and live counts", async () => {
     const stats = await page.$$eval(".hero-stats strong", (els) => els.map((e) => e.textContent.trim()));
+    assert(stats.length === 1, `unexpected extra stats: ${JSON.stringify(stats)}`);
     assert(stats[0] === String(KEPT_SLUGS.size), `kept preachers shown as ${stats[0]}`);
-    assert(stats[1] === data.api.stats.sermons.toLocaleString(), `archive count shown as ${stats[1]}`);
+    const quote = await text(".hero h1");
+    assert(/^A curated archive/.test(quote), `headline was “${quote}”`);
     assert((await page.$$(".card")).length >= 12, "not enough popular cards");
   });
 
