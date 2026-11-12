@@ -14,7 +14,7 @@ Built with Tauri 2, so the whole app is about 5 MB and starts instantly.
 - **Listen in place.** Audio streams from Archive.org with a CDN fallback, played by a persistent bar with a queue, 15-second rewind, 30-second forward, speed control and per-sermon resume.
 - **Watch the video sermons** in a theatre overlay; audio keeps its place when you switch.
 - **Recently played** remembers position, even after a quit.
-- **A hand-picked preacher list.** Eleven preachers are shown; every other sermon in the archive is hidden across lists, search, the queue and history.
+- **A hand-picked preacher list.** Twelve preachers are shown; every other sermon in the archive is hidden across lists, search, the queue and history.
 - **Light and dark**, both derived from the NET Study plum-and-gold palette, following the system by default.
 
 ![Home, dark](docs/home-dark.png)
@@ -31,7 +31,7 @@ Sermons remain the property of the preachers and ministries who hold their right
 
 ## Preachers kept
 
-This build shows sermons from eleven preachers and hides everything else: about 2,900 of the 70,419 sermons. The list is George Whitefield, J.C. Ryle, J.I. Packer, J. Vernon McGee, John Nelson Darby, Martyn Lloyd-Jones, Alistair Begg, Paul Washer, John MacArthur, C.H. Spurgeon and George Mueller.
+This build shows sermons from twelve preachers and hides everything else: about 3,600 of the 70,419 sermons. The list is George Whitefield, J.C. Ryle, J.I. Packer, J. Vernon McGee, John Nelson Darby, Martyn Lloyd-Jones, Alistair Begg, Paul Washer, John Piper, John MacArthur, C.H. Spurgeon and George Mueller.
 
 The SermonIndex API has no denomination, tradition or affiliation field, so this cannot be derived from the data. The list is set by hand in [`src/filters.ts`](src/filters.ts), one line per preacher with a short note. Everything else follows from that:
 

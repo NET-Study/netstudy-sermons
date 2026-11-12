@@ -26,6 +26,7 @@ export const KEPT: KeptPreacher[] = [
   { slug: "martyn-lloyd-jones", name: "Martyn Lloyd-Jones", note: "Westminster Chapel" },
   { slug: "alistair-begg", name: "Alistair Begg", note: "Baptist pastor, Parkside Church" },
   { slug: "paul-washer", name: "Paul Washer", note: "Reformed Baptist evangelist" },
+  { slug: "john-piper", name: "John Piper", note: "Reformed Baptist, Desiring God" },
   { slug: "john-macarthur", name: "John MacArthur", note: "Grace Community Church" },
   { slug: "ch-spurgeon", name: "C.H. Spurgeon", note: "Particular Baptist, Metropolitan Tabernacle" },
   { slug: "george-mueller", name: "George Mueller", note: "Bristol orphan houses, Brethren" },
