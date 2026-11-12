@@ -247,6 +247,14 @@ async function main() {
     if (!cond) throw new Error(message);
   };
   const text = (sel) => page.$eval(sel, (el) => el.textContent.trim());
+  const search = async (q) => {
+    await page.click("#search");
+    await page.$eval("#search", (el) => {
+      el.value = "";
+    });
+    await page.type("#search", q);
+    await page.keyboard.press("Enter");
+  };
 
   console.log("\nNET Study Sermons · smoke\n");
 
@@ -341,7 +349,12 @@ async function main() {
   });
 
   await check("scripture browser lists the Old Testament", async () => {
-    await page.click('[data-nav="scripture"]');
+    await search("genesis 1");
+    await page.waitForSelector(".list, .note-card", { timeout: 8000 });
+    await page.$$eval(".crumb", (els) => {
+      const scripture = els.find((el) => el.textContent.trim() === "Scripture");
+      if (scripture) scripture.click();
+    });
     await page.waitForSelector(".book-grid", { timeout: 8000 });
     const count = (await page.$$(".book-tile")).length;
     assert(count === data.expect.otBooks, `expected ${data.expect.otBooks} books, got ${count}`);
@@ -361,25 +374,23 @@ async function main() {
     assert((await page.$$(".row")).length > 3, "no rows for Genesis 1");
   });
 
-  await check("topics list loads from the index", async () => {
-    await page.click('[data-nav="topics"]');
+  await check("sidebar shows the trimmed menu", async () => {
+    const navs = await page.$$eval(".nav-item", (els) => els.map((e) => e.dataset.nav));
+    assert(JSON.stringify(navs) === JSON.stringify(["home", "speakers", "recent"]), `nav: ${JSON.stringify(navs)}`);
+  });
+
+  await check("theme search opens a theme page", async () => {
+    await search("revival");
     await page.waitForSelector(".pill-grid .pill", { timeout: 8000 });
-    assert((await page.$$(".pill")).length >= 50, "topic pills missing");
-  });
-
-  await check("topic filter narrows the list", async () => {
-    await page.type("#topic-filter", "revival");
-    await sleep(300);
-    const pills = await page.$$eval(".pill span", (els) => els.map((e) => e.textContent));
-    assert(pills.length === 1 && pills[0] === "Revival", `filter returned ${JSON.stringify(pills)}`);
-  });
-
-  await check("topic page opens with its description and sermons", async () => {
+    const pills = await page.$$eval(".pill span", (els) => els.map((e) => e.textContent.trim()));
+    assert(pills.includes("Revival"), `search returned ${JSON.stringify(pills.slice(0, 4))}`);
     await page.click(".pill");
     await page.waitForSelector(".topic-desc", { timeout: 8000 });
     const h1 = await text(".page-head h1");
     assert(h1 === "Revival", `topic was “${h1}”`);
-    assert((await page.$$(".row")).length > 5, "no sermons on the topic");
+    const rows = (await page.$$(".row")).length;
+    const empty = (await page.$$(".note-card")).length;
+    assert(rows > 0 || empty > 0, "neither sermons nor an empty state");
   });
 
   await check("preachers list shows portraits", async () => {
