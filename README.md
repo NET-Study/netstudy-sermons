@@ -2,7 +2,7 @@
 
 A quiet desktop browser and player for the [SermonIndex](https://www.sermonindex.net) archive: 70,419 sermons from 2,211 preachers across 14,087 themes, searchable by scripture reference, theme or name.
 
-Built with Tauri 2, so the whole app is about 5 MB and starts instantly.
+Built with Tauri 2, so the whole app is about 5 MB and starts instantly. (The screenshot below shows the app without its default filtering of preachers.)
 
 ![Home, light](docs/home-light.png)
 
